@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
 public class NotificationTaskService {
     private static final Logger logger = LoggerFactory.getLogger(NotificationTaskService.class);
     private static final Pattern REGEX_DATETIME_TASK = Pattern.compile("(\\d{2}\\.\\d{2}\\.\\d{4}\\s\\d{2}:\\d{2})(\\s+)(.+)");
+    public static final String PATTERN_DATETIME = "dd.MM.yyyy HH:mm";
 
     private final NotificationTaskRepository repo;
     private final TelegramBot bot;
@@ -27,14 +28,15 @@ public class NotificationTaskService {
 
     public void scheduleNotification(NotificationTask task, long chatId){
         task.setChatId(chatId);
-        logger.info("Уведомление запланировано: {}", repo.save(task));
+        repo.save(task);
+        logger.info("Уведомление запланировано: {}", task);
     }
 
     public NotificationTask parseMessage(String message){
         Matcher matcher = REGEX_DATETIME_TASK.matcher(message);
         if (matcher.find()){
             String note = matcher.group(3);
-            LocalDateTime dateToSent = LocalDateTime.parse(matcher.group(1), DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
+            LocalDateTime dateToSent = LocalDateTime.parse(matcher.group(1), DateTimeFormatter.ofPattern(PATTERN_DATETIME));
             NotificationTask task = new NotificationTask(note, dateToSent);
             logger.info("Сохраняю в базу: {}", task);
             repo.save(task);
@@ -46,22 +48,17 @@ public class NotificationTaskService {
     }
 
     public void sendNotificationMessage() {
-        LocalDateTime currentTime = LocalDateTime.now();
-        Collection<NotificationTask> Tasks = repo.findByStatus(NotificationTaskStatus.SCHEDULED);
-        Tasks.stream().filter(task -> task.getDateToSend().isBefore(currentTime)).forEach(task -> {
-            sendMessage(task);
+        Collection<NotificationTask> tasks = repo.findByStatusAndDateToSendLessThanEqual(NotificationTaskStatus.SCHEDULED, LocalDateTime.now());
+        for (NotificationTask task : tasks) {
+            sendMessage(task.getChatId(), task.getNote());
             task.setAsSent();
             repo.save(task);
             logger.info("Уведомление отправлено {}", task);
-        });
+        }
     }
 
     public void sendMessage(long chatId, String messageText) {
         bot.execute(new SendMessage(chatId, messageText));
         logger.info("В чат {} отправлено сообщение: {}", chatId, messageText);
-    }
-
-    public void sendMessage(NotificationTask notificationTask) {
-        sendMessage(notificationTask.getChatId(), notificationTask.getNote());
     }
 }

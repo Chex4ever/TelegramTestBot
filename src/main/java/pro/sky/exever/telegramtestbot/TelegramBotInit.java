@@ -8,8 +8,11 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class TelegramBotInit {
-    @Value("${telegramBot.token}")
-    private String token;
+    private final String token;
+
+    public TelegramBotInit(@Value("${telegramBot.token}") String token ) {
+        this.token = token;
+    }
 
     @Bean
     public TelegramBot telegramBot(){

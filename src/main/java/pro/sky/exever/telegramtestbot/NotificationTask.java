@@ -39,8 +39,6 @@ public class NotificationTask {
         return dateCreated;
     }
 
-
-
     public long getChatId() {
         return chatId;
     }
